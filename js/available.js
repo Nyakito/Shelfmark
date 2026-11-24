@@ -1,5 +1,10 @@
 import { createBookCard, initShelf } from "./shelf.js";
+import {
+  GOOGLE_DRIVE_API_KEY,
+  GOOGLE_DRIVE_FOLDER_ID,
+} from "./drive-config.js";
 
+const DRIVE_API_URL = "https://www.googleapis.com/drive/v3/files";
 const titles = [
   "Between the World and Me", "Bobok", "Coraline", "Crime and Punishment",
   "Dark Matter", "Eloquent JavaScript", "Head First JavaScript", "Laura's Poems",
@@ -27,7 +32,7 @@ const driveIds = [
 ];
 
 const list = document.querySelector("#available-list");
-const books = titles.map((title, index) => ({
+const fallbackBooks = titles.map((title, index) => ({
   key: `drive:${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
   title,
   authors: [],
@@ -38,10 +43,68 @@ const books = titles.map((title, index) => ({
   sourceLabel: "Read on Google Drive",
   searchTitle: title,
   coverId: null,
-  order: index,
 }));
 
+function titleFromFilename(name) {
+  return name
+    .replace(/\.[^.]+$/, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function toDriveBook(file) {
+  const title = titleFromFilename(file.name);
+  return {
+    key: `drive:${file.id}`,
+    title,
+    authors: [],
+    year: null,
+    subject: "Available in the reading room",
+    editions: 0,
+    sourceUrl: `https://drive.google.com/file/d/${file.id}/view`,
+    sourceLabel: "Read on Google Drive",
+    searchTitle: title,
+    coverId: null,
+  };
+}
+
+function render(books) {
+  list.replaceChildren();
+  const fragment = document.createDocumentFragment();
+  for (const book of books) fragment.append(createBookCard(book));
+  list.append(fragment);
+}
+
+async function loadDriveBooks() {
+  const files = [];
+  let pageToken = "";
+  do {
+    const url = new URL(DRIVE_API_URL);
+    url.searchParams.set("key", GOOGLE_DRIVE_API_KEY);
+    url.searchParams.set("q", `'${GOOGLE_DRIVE_FOLDER_ID}' in parents and trashed = false`);
+    url.searchParams.set("orderBy", "modifiedTime desc");
+    url.searchParams.set("pageSize", "1000");
+    url.searchParams.set("fields", "nextPageToken,files(id,name,mimeType)");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Google Drive returned ${response.status}`);
+    const data = await response.json();
+    files.push(...(data.files || []).filter((file) => file.mimeType === "application/pdf"));
+    pageToken = data.nextPageToken || "";
+  } while (pageToken);
+
+  return files.map(toDriveBook);
+}
+
 initShelf();
-const fragment = document.createDocumentFragment();
-for (const book of books) fragment.append(createBookCard(book));
-list.append(fragment);
+render(fallbackBooks); // The shelf remains useful while the live collection loads.
+
+loadDriveBooks()
+  .then((books) => {
+    if (books.length) render(books);
+  })
+  .catch(() => {
+    // The public, checked-in catalogue remains the offline/API-error fallback.
+  });
