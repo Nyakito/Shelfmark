@@ -175,6 +175,10 @@ function formatAuthors(authors) {
 export function createBookCard(book, { onChange } = {}) {
   const article = el("article");
   article.dataset.key = book.key;
+  article.classList.add("book-card");
+  article.tabIndex = 0;
+  article.setAttribute("role", "button");
+  article.setAttribute("aria-label", `View details for ${book.title}`);
 
   // --- Cover (decorative: the text below carries the information) ---
   const kind = (
@@ -246,8 +250,129 @@ export function createBookCard(book, { onChange } = {}) {
   sync();
   info.append(button);
   article.append(cover, info);
+  article.addEventListener("click", (event) => {
+    if (event.target.closest("button, a")) return;
+    openBookDetails(book);
+  });
+  article.addEventListener("keydown", (event) => {
+    if (event.target !== article || !["Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    openBookDetails(book);
+  });
   return article;
 }
+
+/* ---------------------------------------------------------
+   Book details
+--------------------------------------------------------- */
+
+let detailsDialog = null;
+
+function cleanDescription(value) {
+  if (typeof value === "string") return value;
+  if (value && typeof value.value === "string") return value.value;
+  return "A fuller description is not yet available for this edition.";
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>'"]/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;",
+  })[character]);
+}
+
+function closeDetails() {
+  if (!detailsDialog) return;
+  detailsDialog.close();
+}
+
+function ensureDetailsDialog() {
+  if (detailsDialog) return detailsDialog;
+  detailsDialog = document.createElement("dialog");
+  detailsDialog.className = "book-dialog";
+  detailsDialog.innerHTML = `
+    <button class="dialog-close" type="button" aria-label="Close book details">×</button>
+    <div class="dialog-body"></div>`;
+  detailsDialog.querySelector(".dialog-close").addEventListener("click", closeDetails);
+  detailsDialog.addEventListener("click", (event) => {
+    if (event.target === detailsDialog) closeDetails();
+  });
+  document.body.append(detailsDialog);
+  return detailsDialog;
+}
+
+async function findWork(book) {
+  if (book.key?.startsWith("/works/")) return book.key;
+  const query = book.searchTitle || book.title;
+  const response = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(query)}&limit=1&fields=key,title,author_name,first_publish_year,cover_i,subject`);
+  if (!response.ok) throw new HttpError(response.status);
+  return response.json();
+}
+
+function detailContent(book, work = {}) {
+  const authors = Array.isArray(work.authorNames) && work.authorNames.length
+    ? work.authorNames
+    : Array.isArray(work.authors) && work.authors.length
+    ? work.authors.map((author) => author.name).filter(Boolean)
+    : book.authors;
+  const coverId = work.covers?.[0] || book.coverId;
+  const source = book.sourceUrl
+    ? `<a class="source-link" href="${book.sourceUrl}" target="_blank" rel="noopener">${book.sourceLabel || "Open source"} ↗</a>`
+    : "";
+  return `
+    <div class="dialog-cover ${coverId ? "has-cover" : ""}">${coverId ? `<img src="${coverUrl(coverId, "L")}" alt="Cover of ${escapeHtml(book.title)}">` : `<span>${escapeHtml(book.title)}</span>`}</div>
+    <div class="dialog-copy">
+      <p class="dialog-kicker">${book.sourceUrl ? "AVAILABLE IN THE READING ROOM" : "OPEN LIBRARY RECORD"}</p>
+      <h2>${escapeHtml(book.title)}</h2>
+      <p class="dialog-author">${escapeHtml(formatAuthors(authors || []))}${book.year ? ` · First published ${book.year}` : ""}</p>
+      <p class="dialog-description">${escapeHtml(cleanDescription(work.description))}</p>
+      <div class="dialog-actions"><button class="save-button dialog-save" type="button"></button>${source}</div>
+    </div>`;
+}
+
+export async function openBookDetails(book) {
+  const dialog = ensureDetailsDialog();
+  const body = dialog.querySelector(".dialog-body");
+  body.innerHTML = `<p class="dialog-loading">Opening the catalogue record…</p>`;
+  if (!dialog.open) dialog.showModal();
+
+  let record = {};
+  try {
+    let workKey = book.key?.startsWith("/works/") ? book.key : null;
+    if (!workKey) {
+      const search = await findWork(book);
+      const match = search.docs?.[0];
+      if (match) {
+        workKey = match.key;
+        record = { covers: match.cover_i ? [match.cover_i] : [], authorNames: match.author_name || [] };
+      }
+    }
+    if (workKey) {
+      const response = await fetch(`https://openlibrary.org${workKey}.json`);
+      if (response.ok) record = { ...record, ...(await response.json()) };
+    }
+  } catch {
+    // A graceful local record is still more useful than a failed modal.
+  }
+
+  body.innerHTML = detailContent(book, record);
+  const button = body.querySelector(".dialog-save");
+  const sync = () => {
+    const saved = isSaved(book.key);
+    button.textContent = saved ? "Remove from shelf" : "Save to shelf";
+    button.classList.toggle("saved", saved);
+  };
+  button.addEventListener("click", () => {
+    const result = toggleSaved(book);
+    if (result.ok) {
+      sync();
+      updateSavedCount();
+      announce(result.saved ? `${book.title} saved to your shelf.` : `${book.title} removed from your shelf.`);
+    }
+  });
+  sync();
+}
+
+class HttpError extends Error {}
 
 export function createEmptyCard(title, text, link) {
   const card = el("article", "empty-card");

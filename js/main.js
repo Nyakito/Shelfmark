@@ -37,7 +37,10 @@ const API_URL = "https://openlibrary.org/search.json";
 const FIELDS =
   "key,title,author_name,first_publish_year,cover_i,edition_count,subject";
 const LIMIT = 20;
-const DEFAULT_QUERY = "essays"; // fills the shelf on first load; set to "" to keep the static sample books
+const DEFAULT_QUERIES = [
+  "essays", "literary fiction", "poetry", "nature writing", "history",
+  "philosophy", "short stories", "african literature", "science fiction",
+];
 
 let results = []; // normalized books in the API's (relevance) order. Never sorted in place.
 let lastQuery = "";
@@ -200,4 +203,5 @@ window.addEventListener("storage", () => {
    Start
 --------------------------------------------------------- */
 initShelf();
-if (DEFAULT_QUERY) search(DEFAULT_QUERY);
+// The query changes each visit, so the opening shelf always feels newly chosen.
+search(DEFAULT_QUERIES[Math.floor(Math.random() * DEFAULT_QUERIES.length)]);

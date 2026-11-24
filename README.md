@@ -2,7 +2,14 @@
 
 NONE OF THIS COULD HAVE BEEN POSSIBLE WITHOUT OPEN LIBRARY
 
-For now you cant read here, these books might have intellectual property policy or might just be premium things, but as far as Opening the world to readers go, I will link each book to it's `oceanofpdf` link so that you can get access to it, either way.
+## From Me
+
+I have linked my little google drive library, it's interesting that in this library everyone can add books, so come on, add those books you have too see them on the shelf, help the next person Here's the google link to submit your books:
+[Add a book](https://drive.google.com/drive/folders/1OdJJ6XrCGUOnlTftjZhPligy_KeYd5SZ?usp=drive_link)
+
+## Here's something
+
+For now you can not read the `discover` books here, these books might have intellectual property policy or might just be premium things, but as far as Opening the world to readers go, I will link each book to it's `oceanofpdf` link so that you can get access to it, either way.
 
 ## Purpose
 
