@@ -899,9 +899,33 @@ footer p {
   .book-info .author { font-size: 0.86rem; }
   .book-info button, .save-button { width: 100%; min-height: 2.55rem; margin-top: 0.6rem; padding: 0.3rem 0.35rem; font-size: 0.86rem; }
   .book-card:hover .cover, .book-card:focus-visible .cover { transform: translateY(-0.55rem) rotate(-1.5deg); }
-  .dialog-body { grid-template-columns: 1fr; gap: 1.25rem; padding: 2.6rem 1.25rem 1.5rem; overflow-y: auto; }
-  .book-dialog { width: min(100vw - 1rem, 560px); max-height: calc(100dvh - 1rem); }
-  .dialog-cover { min-height: 120px; max-height: 230px; }
+  /* On phones this is a single vertical, scrolling reading sheet. Keeping the
+     cover in normal flow prevents a long synopsis from ever painting over it. */
+  .book-dialog { width: min(100vw - 1rem, 560px); max-height: calc(100dvh - 1rem); overflow: hidden; }
+  .dialog-body {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - 1rem);
+    max-height: calc(100dvh - 1rem);
+    padding: 2.8rem 1.25rem 1.5rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .dialog-cover {
+    height: clamp(130px, 42vw, 190px);
+    flex: 0 0 clamp(130px, 42vw, 190px);
+    min-height: 0;
+    max-height: none;
+    margin-bottom: 0;
+  }
+  .dialog-cover img { display: block; max-height: 100%; }
+  .dialog-copy {
+    position: relative;
+    flex: 0 0 auto;
+    min-width: 0;
+    margin-top: 1.25rem;
+  }
+  .dialog-description { overflow-wrap: anywhere; }
   .dialog-copy h2 { font-size: 2.25rem; }
   .dialog-actions { display: grid; grid-template-columns: 1fr; }
   .dialog-actions .source-link { padding: 0.55rem; text-align: center; }
